@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Replacement Algorithms</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        form {
+            max-width: 400px;
+            margin: 20px auto;
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: large;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background-color: #4c76ff;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #002ac1;
+            transition: 0.3s;
+        }
+        .output {
+            margin-top: 20px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid #ccc;
+            border-radius: 10px;
+        }
+        .stack-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .stack-item {
+            width: 60px;
+            text-align: center;
+            padding: 8px;
+            margin: 4px;
+            background: #f4f4f4;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .stack-item.empty {
+            background: #fff;
+            border-style: dashed;
+        }
+        .page-fault {
+            margin-left: 20px;
+            font-size: 18px;
+            color: red;
+            font-weight: bold;
+        }
+        a{
+            text-decoration: none;
+            color: black;
+        }
+    </style>
+</head>
+<body style="background-image: url(osbg.jpg);">
+    <h1>Page Replacement Algorithm</h1>
+
+    <form id="algorithmForm">
+        <label for="pageReferences">Page References (comma-separated):</label>
+        <input type="text" id="pageReferences" name="pageReferences" placeholder="e.g., 1,2,3,4,1,2,5">
+        
+        <label for="frameCount">Number of Frames:</label>
+        <input type="number" id="frameCount" name="frameCount" min="1" value="3">
+        
+        <button type="button" onclick="simulateLRU()">Simulate LRU</button>
+        <button type="button" onclick="simulateOptimal()">Simulate Optimal</button>
+        <button type="button" onclick="simulateFIFO()">Simulate FIFO</button>
+    </form>
+
+    <div class="output" id="output">
+        <h2>Simulation Result</h2>
+        <p id="pageFaults">Page Faults: </p>
+    </div>
+
+    <script>
+        function simulateLRU() {
+            clearOutput();
+            simulate("LRU");
+        }
+
+        function simulateOptimal() {
+            clearOutput();
+            simulate("Optimal");
+        }
+
+        function simulateFIFO() {
+            clearOutput();
+            simulate("FIFO");
+        }
+
+        function clearOutput() {
+            document.getElementById("output").innerHTML = '<h2>Simulation Result</h2><p id="pageFaults">Page Faults: </p>';
+        }
+
+        function simulate(algorithm) {
+            var pageReferencesInput = document.getElementById("pageReferences").value.trim();
+            var frameCount = parseInt(document.getElementById("frameCount").value);
+
+            if (pageReferencesInput === "") {
+                alert("Please enter page references.");
+                return;
+            }
+
+            var pageReferences = pageReferencesInput.split(",").map(Number);
+            var pageFrames = new Array(frameCount).fill(-1);
+            var pageFaults = 0;
+            var output = "";
+
+            var pageLastUsed = new Array(frameCount).fill(0);
+
+            for (var i = 0; i < pageReferences.length; i++) {
+                var currentPage = pageReferences[i];
+                var pageFound = false;
+
+                // Check if page is already in frame
+                for (var j = 0; j < frameCount; j++) {
+                    if (pageFrames[j] === currentPage) {
+                        pageFound = true;
+                        if (algorithm === "LRU") {
+                            pageLastUsed[j] = i + 1; // Update last used time for LRU
+                        }
+                        break;
+                    }
+                }
+
+                if (!pageFound) {
+                    pageFaults++;
+                    var replaceIndex = -1;
+
+                    if (algorithm === "LRU") {
+                        var leastRecentlyUsedTime = pageLastUsed[0];
+                        replaceIndex = 0;
+
+                        // Find the least recently used page
+                        for (var k = 1; k < frameCount; k++) {
+                            if (pageLastUsed[k] < leastRecentlyUsedTime) {
+                                leastRecentlyUsedTime = pageLastUsed[k];
+                                replaceIndex = k;
+                            }
+                        }
+                    } else if (algorithm === "Optimal") {
+                        var farthestUsed = -1;
+
+                        // Find the page in frames that will be used farthest in the future
+                        for (var k = 0; k < frameCount; k++) {
+                            var page = pageFrames[k];
+                            var farthest = pageReferences.length; // initialize with the maximum possible value
+
+                            for (var m = i + 1; m < pageReferences.length; m++) {
+                                if (pageReferences[m] === page) {
+                                    farthest = m;
+                                    break;
+                                }
+                            }
+
+                            if (farthest > farthestUsed) {
+                                farthestUsed = farthest;
+                                replaceIndex = k;
+                            }
+                        }
+                    } else if (algorithm === "FIFO") {
+                        replaceIndex = i % frameCount;
+                    }
+
+                    // Replace the page in frames
+                    pageFrames[replaceIndex] = currentPage;
+                    if (algorithm === "LRU") {
+                        pageLastUsed[replaceIndex] = i + 1; // Update last used time for LRU
+                    }
+                }
+
+                // Prepare output for each iteration
+                output += "<div class='stack-row'><h4>Step " + (i + 1) + ": Page " + currentPage + "</h4>";
+                for (var j = 0; j < frameCount; j++) {
+                    if (pageFrames[j] !== -1) {
+                        output += "<div class='stack-item'>" + pageFrames[j] + "</div>";
+                    } else {
+                        output += "<div class='stack-item empty'>Empty</div>";
+                    }
+                }
+                output += pageFound ? "<div class='page-fault'>False</div>" : "<div class='page-fault'>True</div>";
+                output += "</div>";
+            }
+
+            // Display the final result
+            document.getElementById("pageFaults").innerHTML = "Page Faults: " + pageFaults;
+            document.getElementById("output").innerHTML += "<h3>Simulation Steps (" + algorithm + "):</h3>" + output;
+        }
+    </script>
+    <a href="OSHOME.HTML">BACK</a>
+</body>
+</html>
